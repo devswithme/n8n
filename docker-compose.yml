@@ -1,0 +1,63 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    volumes:
+      - n8n_data:/home/node/.n8n
+    env_file:
+      - .env.n8n
+    restart: unless-stopped
+    networks:
+      - webproxy
+
+  sign:
+    build: ./sign
+    container_name: sign
+    env_file:
+      - .env.sign
+    restart: unless-stopped
+    networks:
+      - webproxy
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs:ro
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    restart: unless-stopped
+    networks:
+      - webproxy
+
+  nginx-letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nginx-letsencrypt
+    depends_on:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin_123
+    restart: unless-stopped
+    networks:
+      - webproxy
+
+networks:
+  webproxy:
+
+volumes:
+  n8n_data:
+  certs:
+  vhostd:
+  html:
